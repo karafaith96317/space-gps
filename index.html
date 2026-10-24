@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Space GPS</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --bg2: #0d1524;
+    --panel: #121c2e;
+    --border: #243049;
+    --text: #e8eef8;
+    --muted: #8b9bb8;
+    --accent: #4da3ff;
+    --earth: #3dd68c;
+    --sun: #ffc14d;
+    --warn: #ff8f6b;
+    --ok: #3dd68c;
+    --radius: 12px;
+    --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    line-height: 1.45;
+    min-height: 100%;
+  }
+  body {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, #1a2a4a 0%, transparent 55%),
+      radial-gradient(circle at 90% 10%, #1a1040 0%, transparent 30%),
+      var(--bg);
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 3rem;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .75rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+  header h1 {
+    margin: 0; font-size: 1.65rem; letter-spacing: .02em;
+  }
+  header .tag {
+    color: var(--muted); font-size: .9rem;
+  }
+  .banner {
+    background: #152238;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: .85rem 1rem;
+    margin-bottom: 1.25rem;
+    color: var(--muted);
+    font-size: .92rem;
+  }
+  .banner strong { color: var(--accent); }
+  .tabs {
+    display: flex; flex-wrap: wrap; gap: .4rem;
+    margin-bottom: 1.25rem;
+    background: var(--bg2);
+    padding: .4rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .tabs button {
+    flex: 1 1 auto;
+    min-width: 7rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: .65rem .9rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    font-size: .92rem;
+  }
+  .tabs button:hover { color: var(--text); background: #1a2740; }
+  .tabs button.active {
+    background: var(--accent);
+    color: #061018;
+  }
+  .panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.15rem 1.2rem 1.4rem;
+    margin-bottom: 1rem;
+  }
+  .panel.active { display: block; }
+  .panel h2 {
+    margin: 0 0 .35rem;
+    font-size: 1.15rem;
+  }
+  .caption {
+    color: var(--muted);
+    font-size: .85rem;
+    margin: 0 0 1rem;
+  }
+  .grid {
+    display: grid;
+    gap: .75rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 800px) {
+    .grid.cols-3, .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
+  }
+  label.field {
+    display: flex; flex-direction: column; gap: .3rem;
+    font-size: .8rem; color: var(--muted); font-weight: 600;
+  }
+  label.field input, label.field select {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: .55rem .7rem;
+    font: inherit;
+    font-size: .95rem;
+  }
+  label.field input:focus, label.field select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; }
+  button.action {
+    background: #1e3355;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: .55rem .9rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.action:hover { background: #27406a; border-color: var(--accent); }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .75rem;
+    margin: 1rem 0;
+  }
+  .metric {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .75rem .85rem;
+  }
+  .metric .val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .metric .val.ok { color: var(--ok); }
+  .metric .lab {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-top: .15rem;
+  }
+  .metric .det {
+    font-size: .75rem;
+    color: var(--muted);
+    opacity: .9;
+  }
+  .props {
+    list-style: none; margin: 0; padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .props li {
+    display: flex; flex-wrap: wrap; gap: .35rem 1rem;
+    justify-content: space-between;
+    padding: .65rem .9rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .9rem;
+  }
+  .props li:last-child { border-bottom: none; }
+  .props .k { color: var(--muted); }
+  .props .v { color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+  table.dist {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+    margin-top: .5rem;
+  }
+  table.dist th, table.dist td {
+    padding: .5rem .6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  table.dist th { color: var(--muted); font-weight: 600; font-size: .78rem; }
+  table.dist td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: .82rem; }
+  table.dist tr.earth td { color: var(--earth); font-weight: 600; }
+  .map-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: .75rem 0 0;
+  }
+  .map-wrap svg { display: block; width: 100%; height: auto; }
+  .note {
+    color: var(--muted);
+    font-size: .85rem;
+    margin-top: .85rem;
+  }
+  footer {
+    margin-top: 1.5rem;
+    color: var(--muted);
+    font-size: .8rem;
+    text-align: center;
+  }
+  footer a { color: var(--accent); }
+  .section-gap { margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Space GPS</h1>
+    <span class="tag">Surface fix · solar map · orbital &amp; Hohmann Δv</span>
+  </header>
+
+  <div class="banner">
+    <strong>Approximate / not for navigation.</strong>
+    Educational mean-element ephemeris and two-body math — for orientation and first-cut mission sketches, not flight software.
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Mode">
+    <button type="button" class="active" data-mode="where" role="tab" aria-selected="true">Where am I</button>
+    <button type="button" data-mode="orbit" role="tab" aria-selected="false">Orbit</button>
+    <button type="button" data-mode="transfer" role="tab" aria-selected="false">Transfer Δv</button>
+    <button type="button" data-mode="deep" role="tab" aria-selected="false">Deep space</button>
+  </nav>
+
+  <!-- WHERE -->
+  <section id="panel-where" class="panel active" role="tabpanel">
+    <h2>Surface fix</h2>
+    <p class="caption">Approximate ephemeris (mean elements)</p>
+    <div class="grid cols-4">
+      <label class="field">Latitude °
+        <input id="lat" type="number" step="any" value="40.7128" />
+      </label>
+      <label class="field">Longitude °
+        <input id="lon" type="number" step="any" value="-74.0060" />
+      </label>
+      <label class="field">Altitude m
+        <input id="alt" type="number" step="any" value="0" />
+      </label>
+      <label class="field">Preset
+        <select id="preset">
+          <option value="ny">New York</option>
+          <option value="equator">Equator (0,0)</option>
+          <option value="npole">North Pole</option>
+          <option value="antipode">Antipode of NY</option>
+        </select>
+      </label>
+    </div>
+    <div class="metrics" id="where-metrics"></div>
+    <ul class="props" id="where-props"></ul>
+
+    <div class="section-gap">
+      <h2>Solar system map</h2>
+      <p class="caption">Heliocentric ecliptic, top-down · Earth accented</p>
+      <div class="map-wrap" id="map-where"></div>
+    </div>
+
+    <div class="section-gap">
+      <h2>Distances</h2>
+      <p class="caption">Sun row is Earth–Sun; Moon is geocentric; planets are heliocentric</p>
+      <div style="overflow-x:auto">
+        <table class="dist" id="dist-table">
+          <thead>
+            <tr><th>Body</th><th>Distance (AU)</th><th>Distance (km)</th><th>Ecliptic longitude (°)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-gap">
+      <h2>Frames of reference</h2>
+      <div class="banner" style="margin-top:.5rem">You are on a rocky planet ~1 AU from a G-type star in the Orion Arm of the Milky Way.</div>
+      <ul class="props" id="frame-props"></ul>
+    </div>
+  </section>
+
+  <!-- ORBIT -->
+  <section id="panel-orbit" class="panel" role="tabpanel">
+    <h2>Circular Earth orbit</h2>
+    <p class="caption" id="orbit-caption"></p>
+    <div class="grid cols-3">
+      <label class="field">Altitude km
+        <input id="orbit-alt" type="number" step="any" value="400" />
+      </label>
+      <div class="btn-row">
+        <button type="button" class="action" id="btn-leo">LEO 400 km</button>
+        <button type="button" class="action" id="btn-geo">GEO 35786 km</button>
+      </div>
+    </div>
+    <div class="metrics" id="orbit-metrics"></div>
+    <ul class="props" id="orbit-props"></ul>
+  </section>
+
+  <!-- TRANSFER -->
+  <section id="panel-transfer" class="panel" role="tabpanel">
+    <h2>Hohmann transfer (Earth)</h2>
+    <p class="caption">Two-impulse coplanar circular → circular</p>
+    <div class="grid cols-3">
+      <label class="field">Preset
+        <select id="xfer-preset">
+          <option value="leo-geo">LEO → GEO</option>
+          <option value="leo-leo">LEO 400 → 800</option>
+          <option value="leo-moon">LEO → lunar distance</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label class="field">From altitude km
+        <input id="xfer-from" type="number" step="any" value="400" />
+      </label>
+      <label class="field">To altitude km
+        <input id="xfer-to" type="number" step="any" value="35786" />
+      </label>
+    </div>
+    <div class="metrics" id="xfer-metrics"></div>
+    <ul class="props" id="xfer-props"></ul>
+  </section>
+
+  <!-- DEEP -->
+  <section id="panel-deep" class="panel" role="tabpanel">
+    <h2>Deep space</h2>
+    <p class="caption">Live range, light-time, and rough Hohmann phase vs target</p>
+    <div class="grid cols-2" style="max-width:320px">
+      <label class="field">Target
+        <select id="deep-target">
+          <option value="Moon">Moon</option>
+          <option value="Venus">Venus</option>
+          <option value="Mars" selected>Mars</option>
+          <option value="Jupiter">Jupiter</option>
+        </select>
+      </label>
+    </div>
+    <div class="metrics" id="deep-metrics"></div>
+    <ul class="props" id="deep-props"></ul>
+    <p class="note">Phase closeness is a launch-window hint only — real windows need full ephemerides and patched conics.</p>
+    <div class="map-wrap" id="map-deep"></div>
+  </section>
+
+  <footer>
+    Space GPS · MIT © 2026 Kara Faith ·
+    <a href="https://github.com/karafaith96317/space-gps">github.com/karafaith96317/space-gps</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const AU_KM = 149597870.7;
+  const DEG = Math.PI / 180;
+  const RAD = 180 / Math.PI;
+  const MU_EARTH = 398600.4418;
+  const R_EARTH = 6371;
+  const MU_SUN = 1.32712440018e11;
+  const C_KMS = 299792.458;
+
+  function wrap360(x) {
+    let v = x % 360;
+    if (v < 0) v += 360;
+    return v;
+  }
+
+  function julianDay(d) {
+    return d.getTime() / 86400000 + 2440587.5;
+  }
+
+  function julianCenturies(jd) {
+    return (jd - 2451545.0) / 36525;
+  }
+
+  function keplerE(Mdeg, e) {
+    let M = wrap360(Mdeg) * DEG;
+    if (M > Math.PI) M -= 2 * Math.PI;
+    let E = e < 0.8 ? M : Math.PI;
+    for (let i = 0; i < 12; i++) {
+      const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+      E -= dE;
+      if (Math.abs(dE) < 1e-10) break;
+    }
+    return E;
+  }
+
+  function trueAnomaly(E, e) {
+    return (
+      2 *
+      Math.atan2(
+        Math.sqrt(1 + e) * Math.sin(E / 2),
+        Math.sqrt(1 - e) * Math.cos(E / 2)
+      )
+    );
+  }
+
+  const PLANETS = [
+    { name: "Mercury", a: 0.38709927, e: 0.20563593, I: 7.00497902, L0: 252.2503235, Ldot: 149472.67411175, peri0: 77.45779628, periDot: 0.16047689, node0: 48.33076593, nodeDot: -0.12534081 },
+    { name: "Venus", a: 0.72333566, e: 0.00677672, I: 3.39467605, L0: 181.9790995, Ldot: 58517.81538729, peri0: 131.60246718, periDot: 0.00268329, node0: 76.67984255, nodeDot: -0.27769418 },
+    { name: "Earth", a: 1.00000261, e: 0.01671123, I: -0.00001531, L0: 100.46457166, Ldot: 35999.37244981, peri0: 102.93768193, periDot: 0.32327364, node0: 0, nodeDot: 0 },
+    { name: "Mars", a: 1.52371034, e: 0.0933941, I: 1.84969142, L0: -4.55343205, Ldot: 19140.30268499, peri0: -23.94362959, periDot: 0.44441088, node0: 49.55953891, nodeDot: -0.29257343 },
+    { name: "Jupiter", a: 5.202887, e: 0.04838624, I: 1.30439695, L0: 34.39644051, Ldot: 3034.74612775, peri0: 14.72847983, periDot: 0.21252668, node0: 100.47390909, nodeDot: 0.20469106 },
+    { name: "Saturn", a: 9.53667594, e: 0.05386179, I: 2.48599187, L0: 49.95424423, Ldot: 1222.49362201, peri0: 92.59887831, periDot: -0.41897216, node0: 113.66242448, nodeDot: -0.28867794 },
+    { name: "Uranus", a: 19.18916464, e: 0.04725744, I: 0.77263783, L0: 313.23810451, Ldot: 428.48202785, peri0: 170.9542763, periDot: 0.40805281, node0: 74.01692503, nodeDot: 0.04240589 },
+    { name: "Neptune", a: 30.06992276, e: 0.00859048, I: 1.77004347, L0: -55.12002969, Ldot: 218.45945325, peri0: 44.96476227, periDot: -0.32241464, node0: 131.78422574, nodeDot: -0.00508664 },
+  ];
+
+  function planetHelio(el, T) {
+    const a = el.a;
+    const e = el.e;
+    const I = el.I * DEG;
+    const L = wrap360(el.L0 + el.Ldot * T);
+    const peri = wrap360(el.peri0 + el.periDot * T);
+    const node = wrap360(el.node0 + el.nodeDot * T);
+    const M = wrap360(L - peri);
+    const E = keplerE(M, e);
+    const v = trueAnomaly(E, e);
+    const r = a * (1 - e * Math.cos(E));
+    const w = (peri - node) * DEG;
+    const Om = node * DEG;
+    const x = r * (Math.cos(Om) * Math.cos(w + v) - Math.sin(Om) * Math.sin(w + v) * Math.cos(I));
+    const y = r * (Math.sin(Om) * Math.cos(w + v) + Math.cos(Om) * Math.sin(w + v) * Math.cos(I));
+    const lon = wrap360(Math.atan2(y, x) * RAD);
+    return { lon, r };
+  }
+
+  function sunGeo(T) {
+    const L0 = wrap360(280.46646 + 36000.76983 * T + 0.0003032 * T * T);
+    const M = wrap360(357.52911 + 35999.05029 * T - 0.0001537 * T * T);
+    const Mr = M * DEG;
+    const C =
+      (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(Mr) +
+      (0.019993 - 0.000101 * T) * Math.sin(2 * Mr) +
+      0.000289 * Math.sin(3 * Mr);
+    const trueLon = wrap360(L0 + C);
+    const e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T * T;
+    const v = wrap360(M + C);
+    const r = (1.000001018 * (1 - e * e)) / (1 + e * Math.cos(v * DEG));
+    return { lon: trueLon, r };
+  }
+
+  function moonGeo(T) {
+    const Lp = wrap360(218.3164477 + 481267.88123421 * T - 0.0015786 * T * T + (T * T * T) / 538841);
+    const D = wrap360(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T + (T * T * T) / 545868);
+    const M = wrap360(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T);
+    const Mp = wrap360(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + (T * T * T) / 69699);
+    const F = wrap360(93.272095 + 483202.0175233 * T - 0.0036539 * T * T);
+    const lon =
+      Lp +
+      6.289 * Math.sin(Mp * DEG) +
+      1.274 * Math.sin((2 * D - Mp) * DEG) +
+      0.658 * Math.sin(2 * D * DEG) +
+      0.214 * Math.sin(2 * Mp * DEG) -
+      0.186 * Math.sin(M * DEG) -
+      0.114 * Math.sin(2 * F * DEG);
+    const distKm =
+      385000.56 -
+      20905.355 * Math.cos(Mp * DEG) -
+      3699.111 * Math.cos((2 * D - Mp) * DEG) -
+      2955.968 * Math.cos(2 * D * DEG) -
+      569.925 * Math.cos(2 * Mp * DEG) +
+      48.888 * Math.cos(M * DEG);
+    return { lon: wrap360(lon), distKm };
+  }
+
+  function gmstDegrees(jd) {
+    const T = julianCenturies(jd);
+    const gmst =
+      280.46061837 +
+      360.98564736629 * (jd - 2451545.0) +
+      0.000387933 * T * T -
+      (T * T * T) / 38710000;
+    return wrap360(gmst);
+  }
+
+  function sunAltitudeDeg(lat, lon, jd, sunLon) {
+    const T = julianCenturies(jd);
+    const eps = (23.439291 - 0.0130042 * T) * DEG;
+    const l = sunLon * DEG;
+    const sinDec = Math.sin(eps) * Math.sin(l);
+    const cosDec = Math.sqrt(1 - sinDec * sinDec);
+    const dec = Math.atan2(sinDec, cosDec);
+    const ra = Math.atan2(Math.cos(eps) * Math.sin(l), Math.cos(l));
+    const lst = (gmstDegrees(jd) + lon) * DEG;
+    const ha = lst - ra;
+    const latR = lat * DEG;
+    const sinAlt =
+      Math.sin(latR) * Math.sin(dec) +
+      Math.cos(latR) * Math.cos(dec) * Math.cos(ha);
+    return Math.asin(Math.max(-1, Math.min(1, sinAlt))) * RAD;
+  }
+
+  function circularOrbit(altKm) {
+    const r = R_EARTH + altKm;
+    const vCirc = Math.sqrt(MU_EARTH / r);
+    const vEsc = Math.sqrt((2 * MU_EARTH) / r);
+    const periodSec = 2 * Math.PI * Math.sqrt((r * r * r) / MU_EARTH);
+    const energy = -MU_EARTH / (2 * r);
+    return { r, vCirc, vEsc, periodSec, energy };
+  }
+
+  function hohmannEarth(alt1Km, alt2Km) {
+    const r1 = R_EARTH + alt1Km;
+    const r2 = R_EARTH + alt2Km;
+    const aT = (r1 + r2) / 2;
+    const v1 = Math.sqrt(MU_EARTH / r1);
+    const v2 = Math.sqrt(MU_EARTH / r2);
+    const vPeri = Math.sqrt(MU_EARTH * (2 / r1 - 1 / aT));
+    const vApo = Math.sqrt(MU_EARTH * (2 / r2 - 1 / aT));
+    const dv1 = Math.abs(vPeri - v1);
+    const dv2 = Math.abs(v2 - vApo);
+    const tofSec = Math.PI * Math.sqrt((aT * aT * aT) / MU_EARTH);
+    return { r1, r2, aT, dv1, dv2, dvTotal: dv1 + dv2, tofSec, v1, v2 };
+  }
+
+  function hohmannHelio(r1AU, r2AU) {
+    const r1 = r1AU * AU_KM;
+    const r2 = r2AU * AU_KM;
+    const aT = (r1 + r2) / 2;
+    const v1 = Math.sqrt(MU_SUN / r1);
+    const v2 = Math.sqrt(MU_SUN / r2);
+    const vPeri = Math.sqrt(MU_SUN * (2 / r1 - 1 / aT));
+    const vApo = Math.sqrt(MU_SUN * (2 / r2 - 1 / aT));
+    const dv1 = Math.abs(vPeri - v1);
+    const dv2 = Math.abs(v2 - vApo);
+    const tofSec = Math.PI * Math.sqrt((aT * aT * aT) / MU_SUN);
+    const phaseIdeal = wrap360(180 * (1 - Math.pow(aT / r2, 1.5)));
+    return { dv1, dv2, dvTotal: dv1 + dv2, tofSec, phaseIdeal, v1, v2 };
+  }
+
+  function fmtNum(n, digits) {
+    return n.toLocaleString("en-US", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  }
+
+  function fmtDeg(n) {
+    return fmtNum(n, 2) + "°";
+  }
+
+  function fmtDuration(sec) {
+    if (sec < 3600) return fmtNum(sec / 60, 1) + " min";
+    if (sec < 86400) return fmtNum(sec / 3600, 2) + " h";
+    return fmtNum(sec / 86400, 2) + " d";
+  }
+
+  const PRESETS = {
+    ny: { lat: 40.7128, lon: -74.006 },
+    equator: { lat: 0, lon: 0 },
+    npole: { lat: 90, lon: 0 },
+    antipode: { lat: -40.71, lon: 105.99 },
+  };
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderMetrics(el, items) {
+    el.innerHTML = items
+      .map(
+        (m) =>
+          `<div class="metric"><div class="val${m.ok ? " ok" : ""}">${esc(m.value)}</div>` +
+          `<div class="lab">${esc(m.label)}</div>` +
+          (m.detail ? `<div class="det">${esc(m.detail)}</div>` : "") +
+          `</div>`
+      )
+      .join("");
+  }
+
+  function renderProps(el, items) {
+    el.innerHTML = items
+      .map(
+        (p) =>
+          `<li><span class="k">${esc(p.label)}</span><span class="v">${esc(p.value)}</span></li>`
+      )
+      .join("");
+  }
+
+  function renderSolarMap(container, positions) {
+    const W = 1200;
+    const H = 720;
+    const cx = W / 2;
+    const cy = H / 2;
+    const maxAU = 10.5;
+    const scale = (H * 0.42) / maxAU;
+    const shown = positions.filter((p) => p.r <= maxAU);
+    const orbits = [0.387, 0.723, 1.0, 1.524, 5.203, 9.537];
+    const orbitNames = ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn"];
+    const colors = ["#4da3ff", "#ffc14d", "#a78bfa", "#f472b6", "#38bdf8", "#fbbf24"];
+
+    let svg =
+      `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Top-down solar system map with Earth highlighted">` +
+      `<rect x="0" y="0" width="${W}" height="${H}" fill="#0a1220" rx="12"/>`;
+
+    for (let i = 0; i < orbits.length; i++) {
+      const au = orbits[i];
+      const r = au * scale;
+      svg +=
+        `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#243049" stroke-width="1"/>` +
+        `<text x="${cx + r + 6}" y="${cy - 4}" fill="#6b7c99" font-family="system-ui,sans-serif" font-size="11">${orbitNames[i]}</text>`;
+    }
+
+    svg +=
+      `<circle cx="${cx}" cy="${cy}" r="10" fill="#ffc14d"/>` +
+      `<text x="${cx}" y="${cy + 28}" text-anchor="middle" fill="#8b9bb8" font-family="system-ui,sans-serif" font-size="12">Sun</text>`;
+
+    shown.forEach((p, i) => {
+      const ang = -p.lon * DEG;
+      const x = cx + p.r * scale * Math.cos(ang);
+      const y = cy + p.r * scale * Math.sin(ang);
+      const isEarth = !!p.earth;
+      const rDot = isEarth ? 8 : 5;
+      const fill = isEarth ? "#3dd68c" : colors[i % colors.length];
+      svg +=
+        `<circle cx="${x}" cy="${y}" r="${rDot}" fill="${fill}"/>` +
+        `<text x="${x}" y="${y - (isEarth ? 14 : 10)}" text-anchor="middle" fill="#8b9bb8" font-family="system-ui,sans-serif" font-size="${isEarth ? 13 : 11}">${esc(p.name)}</text>`;
+    });
+
+    svg +=
+      `<text x="24" y="${H - 24}" fill="#6b7c99" font-family="system-ui,sans-serif" font-size="11">Top-down ecliptic · orbits to Saturn · approximate ephemeris (mean elements)</text>` +
+      `</svg>`;
+    container.innerHTML = svg;
+  }
+
+  // DOM refs
+  const latEl = document.getElementById("lat");
+  const lonEl = document.getElementById("lon");
+  const altEl = document.getElementById("alt");
+  const presetEl = document.getElementById("preset");
+  const orbitAltEl = document.getElementById("orbit-alt");
+  const xferPresetEl = document.getElementById("xfer-preset");
+  const xferFromEl = document.getElementById("xfer-from");
+  const xferToEl = document.getElementById("xfer-to");
+  const deepTargetEl = document.getElementById("deep-target");
+
+  document.getElementById("orbit-caption").textContent =
+    `μ = ${MU_EARTH} km³/s² · R⊕ = ${R_EARTH} km`;
+
+  // Tabs
+  document.querySelectorAll(".tabs button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-selected", "false");
+      });
+      btn.classList.add("active");
+      btn.setAttribute("aria-selected", "true");
+      document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+      document.getElementById("panel-" + btn.dataset.mode).classList.add("active");
+    });
+  });
+
+  presetEl.addEventListener("change", () => {
+    const p = PRESETS[presetEl.value];
+    if (p) {
+      latEl.value = String(p.lat);
+      lonEl.value = String(p.lon);
+      tick();
+    }
+  });
+
+  document.getElementById("btn-leo").addEventListener("click", () => {
+    orbitAltEl.value = "400";
+    tick();
+  });
+  document.getElementById("btn-geo").addEventListener("click", () => {
+    orbitAltEl.value = "35786";
+    tick();
+  });
+
+  function applyXferPreset(p) {
+    if (p === "leo-geo") {
+      xferFromEl.value = "400";
+      xferToEl.value = "35786";
+    } else if (p === "leo-moon") {
+      xferFromEl.value = "400";
+      xferToEl.value = "384400";
+    } else if (p === "leo-leo") {
+      xferFromEl.value = "400";
+      xferToEl.value = "800";
+    }
+  }
+
+  xferPresetEl.addEventListener("change", () => {
+    applyXferPreset(xferPresetEl.value);
+    tick();
+  });
+
+  [xferFromEl, xferToEl].forEach((el) => {
+    el.addEventListener("input", () => {
+      xferPresetEl.value = "custom";
+      tick();
+    });
+  });
+
+  [latEl, lonEl, altEl, orbitAltEl, deepTargetEl].forEach((el) => {
+    el.addEventListener("input", tick);
+    el.addEventListener("change", tick);
+  });
+
+  function tick() {
+    const now = new Date();
+    const lat = Number(latEl.value);
+    const lon = Number(lonEl.value);
+    const alt = Number(altEl.value);
+    const latOk = Number.isFinite(lat);
+    const lonOk = Number.isFinite(lon);
+    const altOk = Number.isFinite(alt);
+
+    const jd = julianDay(now);
+    const T = julianCenturies(jd);
+    const sun = sunGeo(T);
+    const moon = moonGeo(T);
+    const planets = PLANETS.map((el) => {
+      const h = planetHelio(el, T);
+      return { name: el.name, lon: h.lon, r: h.r };
+    });
+    const earth = planets.find((p) => p.name === "Earth");
+    const earthSunKm = sun.r * AU_KM;
+    const lightMin = earthSunKm / C_KMS / 60;
+    const lst = wrap360(gmstDegrees(jd) + (lonOk ? lon : 0));
+    const sunAlt = latOk && lonOk ? sunAltitudeDeg(lat, lon, jd, sun.lon) : 0;
+    const dayNight = sunAlt > 0 ? "Day" : "Night";
+    const minIncl = latOk ? Math.abs(lat) : 0;
+
+    const localClock = now.toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+
+    const mapPositions = planets
+      .filter((p) =>
+        ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn"].includes(p.name)
+      )
+      .map((p) => ({
+        name: p.name,
+        lon: p.lon,
+        r: p.r,
+        earth: p.name === "Earth",
+      }));
+
+    // Where metrics / props
+    renderMetrics(document.getElementById("where-metrics"), [
+      {
+        value: latOk ? fmtNum(lat, 4) + "°" : "—",
+        label: "Latitude",
+        detail: altOk ? `alt ${fmtNum(alt, 0)} m` : undefined,
+      },
+      { value: lonOk ? fmtNum(lon, 4) + "°" : "—", label: "Longitude" },
+      { value: fmtDeg(lst), label: "Local sidereal time", detail: "approx" },
+      {
+        value: dayNight,
+        label: "Day / night",
+        detail: `sun alt ${fmtNum(sunAlt, 1)}°`,
+        ok: dayNight === "Day",
+      },
+    ]);
+
+    renderProps(document.getElementById("where-props"), [
+      { label: "Local clock (America/New_York)", value: localClock },
+      { label: "UTC", value: now.toISOString().replace("T", " ").slice(0, 19) + " Z" },
+      { label: "Julian day", value: fmtNum(jd, 5) },
+      {
+        label: "Min inclination from this latitude",
+        value: latOk ? `i ≥ ${fmtNum(minIncl, 2)}° (due-east launch)` : "—",
+      },
+    ]);
+
+    renderProps(document.getElementById("frame-props"), [
+      { label: "Earth heliocentric ecliptic longitude", value: fmtDeg(earth.lon) },
+      {
+        label: "Earth–Sun distance",
+        value: fmtNum(earthSunKm, 0) + " km · " + fmtNum(lightMin, 2) + " light-minutes",
+      },
+      { label: "Sun geocentric ecliptic longitude", value: fmtDeg(sun.lon) },
+      { label: "Moon geocentric ecliptic longitude", value: fmtDeg(moon.lon) },
+    ]);
+
+    // Distances table
+    const tbody = document.querySelector("#dist-table tbody");
+    const rows = [];
+    rows.push(["Sun", fmtNum(sun.r, 6), fmtNum(earthSunKm, 0), fmtDeg(sun.lon), false]);
+    rows.push([
+      "Moon",
+      fmtNum(moon.distKm / AU_KM, 8),
+      fmtNum(moon.distKm, 0),
+      fmtDeg(moon.lon),
+      false,
+    ]);
+    for (const p of planets) {
+      const label = p.name === "Earth" ? "Earth (heliocentric)" : p.name;
+      rows.push([
+        label,
+        fmtNum(p.r, 6),
+        fmtNum(p.r * AU_KM, 0),
+        fmtDeg(p.lon),
+        p.name === "Earth",
+      ]);
+    }
+    tbody.innerHTML = rows
+      .map(
+        (r) =>
+          `<tr class="${r[4] ? "earth" : ""}"><td>${esc(r[0])}</td>` +
+          `<td class="num">${esc(r[1])}</td>` +
+          `<td class="num">${esc(r[2])}</td>` +
+          `<td class="num">${esc(r[3])}</td></tr>`
+      )
+      .join("");
+
+    renderSolarMap(document.getElementById("map-where"), mapPositions);
+    renderSolarMap(document.getElementById("map-deep"), mapPositions);
+
+    // Orbit
+    const orbitAlt = Number(orbitAltEl.value);
+    if (Number.isFinite(orbitAlt) && orbitAlt > 0) {
+      const orbit = circularOrbit(orbitAlt);
+      renderMetrics(document.getElementById("orbit-metrics"), [
+        { value: fmtNum(orbit.vCirc, 3), label: "v_circular km/s" },
+        { value: fmtNum(orbit.vEsc, 3), label: "v_escape km/s" },
+        {
+          value: fmtDuration(orbit.periodSec),
+          label: "Period",
+          detail: fmtNum(orbit.periodSec, 0) + " s",
+        },
+        { value: fmtNum(orbit.r, 1), label: "Radius km", detail: "from Earth center" },
+      ]);
+      renderProps(document.getElementById("orbit-props"), [
+        { label: "Specific energy ε", value: fmtNum(orbit.energy, 3) + " km²/s²" },
+        {
+          label: "Mean motion n",
+          value: fmtNum((360 / orbit.periodSec) * 3600, 4) + " °/h",
+        },
+        {
+          label: "Use",
+          value:
+            "Size parking orbits, check period vs ground track, compare escape vs circular speed",
+        },
+      ]);
+    } else {
+      document.getElementById("orbit-metrics").innerHTML = "";
+      renderProps(document.getElementById("orbit-props"), [
+        { label: "Status", value: "Enter a positive altitude in km." },
+      ]);
+    }
+
+    // Transfer
+    const xferFrom = Number(xferFromEl.value);
+    const xferTo = Number(xferToEl.value);
+    if (
+      Number.isFinite(xferFrom) &&
+      Number.isFinite(xferTo) &&
+      xferFrom > 0 &&
+      xferTo > 0
+    ) {
+      const transfer = hohmannEarth(xferFrom, xferTo);
+      renderMetrics(document.getElementById("xfer-metrics"), [
+        { value: fmtNum(transfer.dv1, 3), label: "Δv₁ km/s", detail: "departure burn" },
+        { value: fmtNum(transfer.dv2, 3), label: "Δv₂ km/s", detail: "arrival burn" },
+        { value: fmtNum(transfer.dvTotal, 3), label: "Δv total km/s" },
+        { value: fmtDuration(transfer.tofSec), label: "Transfer time" },
+      ]);
+      renderProps(document.getElementById("xfer-props"), [
+        { label: "Transfer semi-major axis", value: fmtNum(transfer.aT, 1) + " km" },
+        {
+          label: "Circular speeds",
+          value: fmtNum(transfer.v1, 3) + " → " + fmtNum(transfer.v2, 3) + " km/s",
+        },
+        {
+          label: "Note",
+          value:
+            "Ignores plane change, atmosphere, and third-body effects. Lunar-distance preset is a ballistic ellipse to Moon range, not a real lunar capture.",
+        },
+      ]);
+    } else {
+      document.getElementById("xfer-metrics").innerHTML = "";
+      renderProps(document.getElementById("xfer-props"), [
+        { label: "Status", value: "Enter positive from/to altitudes in km." },
+      ]);
+    }
+
+    // Deep space
+    const target = deepTargetEl.value;
+    const earthR = earth.r;
+    let targetR = earthR;
+    let targetLon = earth.lon;
+    let rangeKm = 0;
+    if (target === "Moon") {
+      rangeKm = moon.distKm;
+      targetR = earthR;
+      targetLon = moon.lon;
+    } else {
+      const p = planets.find((x) => x.name === target);
+      targetR = p.r;
+      targetLon = p.lon;
+      const dLon = (targetLon - earth.lon) * DEG;
+      rangeKm =
+        AU_KM *
+        Math.sqrt(
+          earthR * earthR + targetR * targetR - 2 * earthR * targetR * Math.cos(dLon)
+        );
+    }
+    const lightSec = rangeKm / C_KMS;
+    const phaseNow = wrap360(targetLon - earth.lon);
+    const h = target === "Moon" ? null : hohmannHelio(earthR, targetR);
+    const phaseErr =
+      h == null
+        ? null
+        : Math.min(
+            Math.abs(phaseNow - h.phaseIdeal),
+            360 - Math.abs(phaseNow - h.phaseIdeal)
+          );
+    const leo = circularOrbit(400);
+    const vInfApprox = h ? h.dv1 : 0;
+    const c3 = vInfApprox * vInfApprox;
+
+    renderMetrics(document.getElementById("deep-metrics"), [
+      {
+        value: fmtNum(rangeKm, 0),
+        label: "Range km",
+        detail: target === "Moon" ? "geocentric" : "ecliptic-plane approx",
+      },
+      {
+        value:
+          lightSec < 60
+            ? fmtNum(lightSec, 2) + " s"
+            : fmtNum(lightSec / 60, 2) + " min",
+        label: "One-way light time",
+      },
+      {
+        value: fmtDeg(phaseNow),
+        label: "Phase angle now",
+        detail: "target − Earth ecliptic lon",
+      },
+      {
+        value: h ? fmtDeg(h.phaseIdeal) : "—",
+        label: "Ideal Hohmann phase",
+        detail:
+          phaseErr != null
+            ? `off by ${fmtNum(phaseErr, 1)}°`
+            : "Moon: use lunar transfer",
+      },
+    ]);
+
+    if (h) {
+      renderProps(document.getElementById("deep-props"), [
+        {
+          label: "Heliocentric Hohmann Δv (planet→planet)",
+          value:
+            fmtNum(h.dvTotal, 3) +
+            " km/s (" +
+            fmtNum(h.dv1, 3) +
+            " + " +
+            fmtNum(h.dv2, 3) +
+            ")",
+        },
+        { label: "Transfer time", value: fmtDuration(h.tofSec) },
+        { label: "Earth heliocentric r", value: fmtNum(earthR, 6) + " AU" },
+        { label: "Target heliocentric r", value: fmtNum(targetR, 6) + " AU" },
+        {
+          label: "Rough C3 proxy",
+          value:
+            fmtNum(c3, 2) +
+            " km²/s² (heliocentric departure Δv as v∞ stand-in)",
+        },
+        { label: "LEO escape (400 km)", value: fmtNum(leo.vEsc, 3) + " km/s" },
+        {
+          label: "Comms",
+          value:
+            "Round-trip delay ≈ " +
+            (lightSec * 2 < 60
+              ? fmtNum(lightSec * 2, 1) + " s"
+              : fmtNum((lightSec * 2) / 60, 2) + " min"),
+        },
+      ]);
+    } else {
+      renderProps(document.getElementById("deep-props"), [
+        { label: "Moon distance", value: fmtNum(moon.distKm, 0) + " km" },
+        { label: "Round-trip light time", value: fmtNum(lightSec * 2, 2) + " s" },
+        {
+          label: "Tip",
+          value:
+            "For lunar Δv, use Transfer mode LEO → lunar distance, then add capture burns separately",
+        },
+      ]);
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
