@@ -1,6 +1,6 @@
 # Space GPS
 
-Interactive browser tool to see **where you are on Earth**, where **Earth sits in the solar system**, and first-cut **orbital / Hohmann Δv** numbers for flight planning — plus a dedicated **Mars Telemetry** ops tab.
+Interactive browser tool to see **where you are on Earth**, where **Earth sits in the solar system**, and first-cut **orbital / Hohmann Δv** numbers for flight planning — plus a dedicated **Mars Telemetry** ops tab with Kara's **28-hour Mars clock**.
 
 Educational **mean-element ephemeris** and **two-body** math — good for orientation and mission sketches, **not** flight software or navigation.
 
@@ -26,9 +26,15 @@ Double-click `index.html`, or drag it into a browser tab. Works offline once loa
 | **Orbit** | Circular Earth orbit: \(v_\mathrm{circ}\), \(v_\mathrm{esc}\), period, radius, specific energy; quick LEO 400 / GEO 35786 |
 | **Transfer Δv** | Hohmann Earth circular→circular; presets LEO→GEO, LEO 400→800, LEO→lunar distance; Δv₁, Δv₂, total, TOF |
 | **Deep space** | Target Moon / Venus / Mars / Jupiter: range, one-way light time, phase now vs ideal Hohmann, heliocentric Hohmann Δv + TOF (planets), round-trip delay, map |
-| **Mars Telemetry** | Ops panel: Earth–Mars range (km/AU), one-way + RTT light time, range rate, helio longitudes + phase vs Hohmann, solar elongation / conjunction flags, Mars solar distance + flux vs Earth; optional Curiosity REMS weather with offline fallback |
+| **Mars Telemetry** | Ops panel: **28-hour Mars clock** (MTC/LMST on a 28-hour face, MSD, Earth UTC + America/New_York), Earth–Mars range (km/AU), one-way + RTT light time, range rate, helio longitudes + phase vs Hohmann, solar elongation / conjunction flags, Mars solar distance + flux vs Earth; optional Curiosity REMS weather with offline fallback |
 
 Ephemeris and clocks refresh every **1 second**.
+
+### Mars 28-hour clock
+
+One Mars mean solar day is divided into **28 equal hours** (≈ 52.84 Earth minutes each) — not the conventional 24-hour Mars LMST face. MSD uses Allison & McEwen / NASA Mars24 formulas in plain JS (no SPICE).
+
+For the **full relativistic Patla–Ashby Areocentric Coordinate Time** offset (µs/day), see the private companion repo **[mars-time-calculator](https://github.com/karafaith96317/mars-time-calculator)**.
 
 ## Accuracy disclaimer
 
@@ -40,6 +46,7 @@ Ephemeris and clocks refresh every **1 second**.
 - Hohmann assumes coplanar circular orbits; ignores plane change, drag, third bodies
 - Deep-space range is ecliptic-plane geometry (except Moon: geocentric distance)
 - Mars telemetry is **not spacecraft downlink**
+- 28-hour face is educational mean-solar mapping, not flight timekeeping
 
 ## Constants
 
@@ -49,6 +56,8 @@ Ephemeris and clocks refresh every **1 second**.
 | R_earth | 6371 km |
 | μ_sun | 1.32712440018×10¹¹ km³/s² |
 | AU | 149597870.7 km |
+| Mars hours / sol | 28 |
+| Mars sol (Earth days) | 1.027491252 |
 
 ## License
 

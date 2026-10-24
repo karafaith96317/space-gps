@@ -374,6 +374,13 @@
       <strong>Approx ephemeris / not downlink.</strong>
       Range, light-time, and Hohmann figures are computed locally every second. Optional Curiosity REMS weather loads only when the network allows; otherwise this panel stays fully offline.
     </div>
+    <div class="section-gap" style="margin-top:0">
+      <h2>Mars 28-hour clock</h2>
+      <p class="caption">One Mars sol ÷ 28 equal hours (≈ 52.84 Earth min each) · Allison &amp; McEwen MSD · not the conventional 24h Mars face</p>
+      <div class="metrics" id="mars-clock-metrics"></div>
+      <ul class="props" id="mars-clock-props"></ul>
+      <p class="note">Full relativistic Patla–Ashby offset lives in <a href="https://github.com/karafaith96317/mars-time-calculator">mars-time-calculator</a> (private).</p>
+    </div>
     <div class="metrics" id="mars-metrics"></div>
     <ul class="props" id="mars-props"></ul>
     <div class="section-gap">
@@ -407,6 +414,56 @@
   const R_EARTH = 6371;
   const MU_SUN = 1.32712440018e11;
   const C_KMS = 299792.458;
+  const MARS_HOURS_PER_SOL = 28;
+  const MARS_SOL_EARTH_DAYS = 1.027491252;
+  const GALE_LON_EAST = 137.4;
+
+  function marsSolDate(jd) {
+    return (jd - 2451549.5) / MARS_SOL_EARTH_DAYS + 44796.0 - 0.0009626;
+  }
+
+  function formatHms28(frac) {
+    let f = frac % 1;
+    if (f < 0) f += 1;
+    const total = f * MARS_HOURS_PER_SOL;
+    const h = Math.floor(total) % MARS_HOURS_PER_SOL;
+    const minF = (total - Math.floor(total)) * 60;
+    const m = Math.floor(minF);
+    const s = Math.floor((minF - m) * 60);
+    const pad = (n) => String(n).padStart(2, "0");
+    return { h, m, s, text: pad(h) + ":" + pad(m) + ":" + pad(s) };
+  }
+
+  function computeMars28Clock(now, lonDegEast) {
+    const jd = julianDay(now);
+    const msd = marsSolDate(jd);
+    let frac = msd % 1;
+    if (frac < 0) frac += 1;
+    const mtc = formatHms28(frac);
+    let lmstF = frac - lonDegEast / 360;
+    lmstF = lmstF % 1;
+    if (lmstF < 0) lmstF += 1;
+    const lmst = formatHms28(lmstF);
+    return {
+      jd,
+      msd,
+      mtc28: mtc.text,
+      lmst28: lmst.text,
+      utc: now.toISOString().replace("T", " ").slice(0, 19) + " Z",
+      americaNewYork: now.toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }),
+    };
+  }
+
 
   function wrap360(x) {
     let v = x % 360;
@@ -1151,6 +1208,39 @@
     }
 
     // —— Mars telemetry ops panel ——
+    const clock28 = computeMars28Clock(now, GALE_LON_EAST);
+    renderMetrics(document.getElementById("mars-clock-metrics"), [
+      {
+        value: clock28.mtc28,
+        label: "MTC /28",
+        detail: "prime meridian · 28-hour face",
+      },
+      {
+        value: clock28.lmst28,
+        label: "LMST /28 (Gale)",
+        detail: GALE_LON_EAST + "°E · approx",
+      },
+      {
+        value: fmtNum(clock28.msd, 5),
+        label: "Mars Sol Date",
+        detail: "Allison & McEwen",
+      },
+      {
+        value: clock28.utc.slice(11, 19),
+        label: "Earth UTC",
+        detail: "America/New_York below",
+      },
+    ]);
+    renderProps(document.getElementById("mars-clock-props"), [
+      { label: "Earth UTC", value: clock28.utc },
+      { label: "America/New_York", value: clock28.americaNewYork },
+      { label: "Julian day", value: fmtNum(clock28.jd, 5) },
+      {
+        label: "Face",
+        value: "One Mars sol ÷ 28 equal hours (not ~24.6h-as-24h framing)",
+      },
+    ]);
+
     const mars = planets.find((p) => p.name === "Mars");
     const geo = earthMarsGeometry(earth, mars);
     const lightOne = geo.rangeKm / C_KMS;
