@@ -61,4 +61,4 @@ For the **full relativistic Patla–Ashby Areocentric Coordinate Time** offset (
 
 ## License
 
-MIT — Copyright © 2026 Kara Faith. See [LICENSE](LICENSE).
+Copyright (c) 2026 Kara Faith Sypen. All rights reserved. Proprietary — see [LICENSE](LICENSE). Visibility grants no license to copy, distribute, or use for ML training.
