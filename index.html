@@ -236,7 +236,7 @@
 <div class="wrap">
   <header>
     <h1>Space GPS</h1>
-    <span class="tag">Surface fix · solar map · orbital &amp; Hohmann Δv</span>
+    <span class="tag">Surface fix · solar map · orbital &amp; Hohmann Δv · Mars telemetry</span>
   </header>
 
   <div class="banner">
@@ -249,6 +249,7 @@
     <button type="button" data-mode="orbit" role="tab" aria-selected="false">Orbit</button>
     <button type="button" data-mode="transfer" role="tab" aria-selected="false">Transfer Δv</button>
     <button type="button" data-mode="deep" role="tab" aria-selected="false">Deep space</button>
+    <button type="button" data-mode="mars" role="tab" aria-selected="false">Mars Telemetry</button>
   </nav>
 
   <!-- WHERE -->
@@ -362,6 +363,31 @@
     <ul class="props" id="deep-props"></ul>
     <p class="note">Phase closeness is a launch-window hint only — real windows need full ephemerides and patched conics.</p>
     <div class="map-wrap" id="map-deep"></div>
+  </section>
+
+
+  <!-- MARS TELEMETRY -->
+  <section id="panel-mars" class="panel" role="tabpanel">
+    <h2>Mars telemetry</h2>
+    <p class="caption">Flight/ops-style panel from approximate mean-element ephemeris — not spacecraft downlink</p>
+    <div class="banner" style="margin-bottom:1rem">
+      <strong>Approx ephemeris / not downlink.</strong>
+      Range, light-time, and Hohmann figures are computed locally every second. Optional Curiosity REMS weather loads only when the network allows; otherwise this panel stays fully offline.
+    </div>
+    <div class="metrics" id="mars-metrics"></div>
+    <ul class="props" id="mars-props"></ul>
+    <div class="section-gap">
+      <h2>Ops notes</h2>
+      <ul class="props" id="mars-ops"></ul>
+    </div>
+    <div class="section-gap">
+      <h2>Curiosity REMS (optional)</h2>
+      <p class="caption">Latest Gale Crater sol from NASA MSL weather feed when reachable</p>
+      <div class="metrics" id="mars-weather-metrics"></div>
+      <ul class="props" id="mars-weather-props"></ul>
+      <p class="note" id="mars-weather-note">Weather: checking network…</p>
+    </div>
+    <div class="map-wrap" id="map-mars"></div>
   </section>
 
   <footer>
@@ -649,6 +675,110 @@
       `<text x="24" y="${H - 24}" fill="#6b7c99" font-family="system-ui,sans-serif" font-size="11">Top-down ecliptic · orbits to Saturn · approximate ephemeris (mean elements)</text>` +
       `</svg>`;
     container.innerHTML = svg;
+  }
+
+
+  let prevMarsRangeKm = null;
+  let marsWeather = { status: "pending", sol: null };
+
+  function earthMarsGeometry(earth, mars) {
+    const eLon = earth.lon * DEG;
+    const mLon = mars.lon * DEG;
+    const ex = earth.r * Math.cos(eLon);
+    const ey = earth.r * Math.sin(eLon);
+    const mx = mars.r * Math.cos(mLon);
+    const my = mars.r * Math.sin(mLon);
+    const dx = mx - ex;
+    const dy = my - ey;
+    const rangeAU = Math.sqrt(dx * dx + dy * dy);
+    const rangeKm = rangeAU * AU_KM;
+    // Solar elongation: angle at Earth between Sun and Mars
+    const sx = -ex;
+    const sy = -ey;
+    const sMag = Math.sqrt(sx * sx + sy * sy) || 1e-12;
+    const dMag = rangeAU || 1e-12;
+    let cosEl = (sx * dx + sy * dy) / (sMag * dMag);
+    cosEl = Math.max(-1, Math.min(1, cosEl));
+    const elongation = Math.acos(cosEl) * RAD;
+    const phaseNow = wrap360(mars.lon - earth.lon);
+    return { rangeAU, rangeKm, elongation, phaseNow, ex, ey, mx, my };
+  }
+
+  function marsCommsLabel(elongation) {
+    if (elongation < 12) {
+      return {
+        label: "Near superior conjunction",
+        detail: "elongation ~0° — Sun-Earth-Mars line; DSN / downlink awkward",
+        friendly: false,
+      };
+    }
+    if (elongation > 168) {
+      return {
+        label: "Near opposition",
+        detail: "elongation ~180° — shortest range, strong geometry",
+        friendly: true,
+      };
+    }
+    // Outer planet: no true inferior conjunction; flag soft proximity only
+    if (elongation < 25) {
+      return {
+        label: "Approaching superior conjunction",
+        detail: "elongation low — treat as conjunction-proximity risk",
+        friendly: false,
+      };
+    }
+    return {
+      label: "Comms-window friendly",
+      detail: "not near solar conjunction (rough)",
+      friendly: true,
+    };
+  }
+
+  function fetchMarsWeather() {
+    const url =
+      "https://mars.nasa.gov/rss/api/?feed=weather&category=msl&feedtype=json";
+    const note = document.getElementById("mars-weather-note");
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then((data) => {
+        const soles = (data && data.soles) || [];
+        if (!soles.length) throw new Error("empty soles");
+        const s = soles[0];
+        marsWeather = {
+          status: "ok",
+          sol: s.sol,
+          date: s.terrestrial_date,
+          minTemp: s.min_temp,
+          maxTemp: s.max_temp,
+          pressure: s.pressure,
+          opacity: s.atmo_opacity || s.atmo_opac || "—",
+          uv: s.local_uv_irradiance_index || "—",
+          season: s.season || "—",
+        };
+        if (note) note.textContent = "Curiosity REMS live feed (latest sol).";
+        tick();
+      })
+      .catch(() => {
+        marsWeather = { status: "offline", sol: null };
+        if (note) {
+          note.textContent =
+            "Weather feed unavailable (CORS/network). Computed ephemeris telemetry only — app stays usable offline.";
+        }
+        const wm = document.getElementById("mars-weather-metrics");
+        const wp = document.getElementById("mars-weather-props");
+        if (wm) wm.innerHTML = "";
+        if (wp) {
+          renderProps(wp, [
+            {
+              label: "REMS",
+              value: "Skipped — graceful offline fallback",
+            },
+          ]);
+        }
+      });
   }
 
   // DOM refs
@@ -1019,9 +1149,142 @@
         },
       ]);
     }
+
+    // —— Mars telemetry ops panel ——
+    const mars = planets.find((p) => p.name === "Mars");
+    const geo = earthMarsGeometry(earth, mars);
+    const lightOne = geo.rangeKm / C_KMS;
+    const lightRtt = lightOne * 2;
+    let rangeRate = null;
+    if (prevMarsRangeKm != null) {
+      rangeRate = geo.rangeKm - prevMarsRangeKm; // km/s over ~1s tick
+    }
+    prevMarsRangeKm = geo.rangeKm;
+    const hMars = hohmannHelio(earth.r, mars.r);
+    const phaseErrMars = Math.min(
+      Math.abs(geo.phaseNow - hMars.phaseIdeal),
+      360 - Math.abs(geo.phaseNow - hMars.phaseIdeal)
+    );
+    const comms = marsCommsLabel(geo.elongation);
+    const fluxVsEarth = 1 / (mars.r * mars.r); // approx vs 1 AU
+
+    renderMetrics(document.getElementById("mars-metrics"), [
+      {
+        value: fmtNum(geo.rangeKm, 0),
+        label: "Earth–Mars range km",
+        detail: fmtNum(geo.rangeAU, 6) + " AU",
+      },
+      {
+        value: fmtNum(lightOne / 60, 2) + " min",
+        label: "One-way light time",
+        detail: "RTT " + fmtNum(lightRtt / 60, 2) + " min",
+      },
+      {
+        value: rangeRate == null ? "—" : (rangeRate >= 0 ? "+" : "") + fmtNum(rangeRate, 3),
+        label: "Range rate km/s",
+        detail: "finite Δrange / 1 s",
+      },
+      {
+        value: fmtDeg(geo.elongation),
+        label: "Solar elongation",
+        detail: "∠ Sun–Earth–Mars",
+        ok: comms.friendly,
+      },
+    ]);
+
+    renderProps(document.getElementById("mars-props"), [
+      { label: "Earth heliocentric ecliptic lon", value: fmtDeg(earth.lon) },
+      { label: "Mars heliocentric ecliptic lon", value: fmtDeg(mars.lon) },
+      {
+        label: "Phase angle (Mars − Earth)",
+        value: fmtDeg(geo.phaseNow),
+      },
+      {
+        label: "Ideal Hohmann phase",
+        value: fmtDeg(hMars.phaseIdeal) + " · off by " + fmtNum(phaseErrMars, 1) + "°",
+      },
+      {
+        label: "Heliocentric Hohmann Δv total",
+        value:
+          fmtNum(hMars.dvTotal, 3) +
+          " km/s (" +
+          fmtNum(hMars.dv1, 3) +
+          " + " +
+          fmtNum(hMars.dv2, 3) +
+          ")",
+      },
+      { label: "Hohmann TOF", value: fmtDuration(hMars.tofSec) },
+      {
+        label: "Mars solar distance",
+        value: fmtNum(mars.r, 6) + " AU",
+      },
+      {
+        label: "Solar flux vs Earth (1/r²)",
+        value: fmtNum(fluxVsEarth * 100, 1) + "% of 1 AU (~" + fmtNum(fluxVsEarth, 3) + "×)",
+      },
+      {
+        label: "Comms geometry",
+        value: comms.label + " — " + comms.detail,
+      },
+    ]);
+
+    renderProps(document.getElementById("mars-ops"), [
+      {
+        label: "Source",
+        value: "Mean-element Kepler ephemeris (educational) — not spacecraft telemetry",
+      },
+      {
+        label: "Conjunction watch",
+        value:
+          geo.elongation < 25
+            ? "Superior conjunction proximity — expect Sun outage risk for Mars links"
+            : "No superior-conjunction proximity flag",
+      },
+      {
+        label: "Inferior conjunction",
+        value: "N/A for Mars (outer planet); use opposition vs superior conjunction",
+      },
+      {
+        label: "Refresh",
+        value: "1 Hz local tick · weather optional network",
+      },
+    ]);
+
+    if (marsWeather.status === "ok") {
+      renderMetrics(document.getElementById("mars-weather-metrics"), [
+        {
+          value: "Sol " + marsWeather.sol,
+          label: "Curiosity sol",
+          detail: marsWeather.date || "",
+        },
+        {
+          value: marsWeather.minTemp + " / " + marsWeather.maxTemp + " °C",
+          label: "Min / max air temp",
+        },
+        {
+          value: String(marsWeather.pressure),
+          label: "Pressure Pa",
+          detail: String(marsWeather.opacity),
+        },
+        {
+          value: String(marsWeather.uv),
+          label: "UV index",
+          detail: String(marsWeather.season),
+        },
+      ]);
+      renderProps(document.getElementById("mars-weather-props"), [
+        {
+          label: "Feed",
+          value: "NASA MSL / Curiosity REMS JSON (optional)",
+        },
+      ]);
+    }
+
+    renderSolarMap(document.getElementById("map-mars"), mapPositions);
   }
 
   tick();
+  fetchMarsWeather();
   setInterval(tick, 1000);
 })();
 </script>

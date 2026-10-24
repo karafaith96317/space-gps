@@ -1,6 +1,6 @@
 # Space GPS
 
-Interactive browser tool to see **where you are on Earth**, where **Earth sits in the solar system**, and first-cut **orbital / Hohmann Δv** numbers for flight planning.
+Interactive browser tool to see **where you are on Earth**, where **Earth sits in the solar system**, and first-cut **orbital / Hohmann Δv** numbers for flight planning — plus a dedicated **Mars Telemetry** ops tab.
 
 Educational **mean-element ephemeris** and **two-body** math — good for orientation and mission sketches, **not** flight software or navigation.
 
@@ -16,7 +16,7 @@ open index.html
 # or: python -m http.server 8080  →  http://localhost:8080
 ```
 
-Double-click `index.html`, or drag it into a browser tab. Works offline once loaded.
+Double-click `index.html`, or drag it into a browser tab. Works offline once loaded (Mars weather is optional network).
 
 ## Modes
 
@@ -26,6 +26,7 @@ Double-click `index.html`, or drag it into a browser tab. Works offline once loa
 | **Orbit** | Circular Earth orbit: \(v_\mathrm{circ}\), \(v_\mathrm{esc}\), period, radius, specific energy; quick LEO 400 / GEO 35786 |
 | **Transfer Δv** | Hohmann Earth circular→circular; presets LEO→GEO, LEO 400→800, LEO→lunar distance; Δv₁, Δv₂, total, TOF |
 | **Deep space** | Target Moon / Venus / Mars / Jupiter: range, one-way light time, phase now vs ideal Hohmann, heliocentric Hohmann Δv + TOF (planets), round-trip delay, map |
+| **Mars Telemetry** | Ops panel: Earth–Mars range (km/AU), one-way + RTT light time, range rate, helio longitudes + phase vs Hohmann, solar elongation / conjunction flags, Mars solar distance + flux vs Earth; optional Curiosity REMS weather with offline fallback |
 
 Ephemeris and clocks refresh every **1 second**.
 
@@ -38,6 +39,7 @@ Ephemeris and clocks refresh every **1 second**.
 - Sun μ and AU as conventional constants; Moon via truncated analytical series
 - Hohmann assumes coplanar circular orbits; ignores plane change, drag, third bodies
 - Deep-space range is ecliptic-plane geometry (except Moon: geocentric distance)
+- Mars telemetry is **not spacecraft downlink**
 
 ## Constants
 
